@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-from streamlit_gsheets import GSheetsConnection
+from streamlit_gsheets_connection import GSheetsConnection # <-- DÜZELTİLMİŞ SATIR
 
 # -------------------- SAYFA AYARLARI --------------------
 st.set_page_config(
