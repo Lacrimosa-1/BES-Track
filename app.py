@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-from streamlit_gsheets_connection import GSheetsConnection # <-- DÜZELTİLMİŞ SATIR
+from streamlit_gsheets import GSheetsConnection # <-- DOĞRU IMPORT İFADESİ BU
 
 # -------------------- SAYFA AYARLARI --------------------
 st.set_page_config(
@@ -12,28 +12,23 @@ st.set_page_config(
 )
 
 # -------------------- GOOGLE SHEETS BAĞLANTISI --------------------
-# Bu kod, Streamlit'in "Secrets" bölümündeki bilgilere göre bağlantı kurar.
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
     st.error("Google Sheets bağlantısı kurulamadı. Lütfen Streamlit Cloud > Secrets ayarlarınızı ve Google Sheets paylaşım izinlerinizi kontrol edin.")
-    st.stop() # Hata varsa uygulamayı durdur
+    st.stop() 
 
 # -------------------- ANA BAŞLIK --------------------
 st.title("📊 Bireysel Emeklilik Sözleşme Takibi")
 
-# Tek bir sözleşme olduğunu varsayıyoruz. Sayfanın adı.
 WORKSHEET_NAME = "sozlesme_1" 
 
 # -------------------- VERİYİ GOOGLE SHEETS'TEN OKUMA --------------------
 try:
-    # Veriyi oku, cache'i 5 saniye tut (sürekli okuma yapmamak için)
     existing_data = conn.read(worksheet=WORKSHEET_NAME, usecols=list(range(11)), ttl=5)
-    # Tamamen boş satırları kaldır
     existing_data = existing_data.dropna(how="all")
 except Exception as e:
     st.warning(f"'{WORKSHEET_NAME}' sayfası okunamadı. Sayfa boş olabilir veya bir hata oluştu. Yeni veri ekleyerek başlayabilirsiniz.")
-    # Hata durumunda, kodun çökmemesi için boş bir DataFrame oluştur
     existing_data = pd.DataFrame()
 
 
@@ -42,7 +37,6 @@ with st.form("veri_giris_formu", clear_on_submit=True):
     st.subheader("➕ Yeni Veri Girişi Yap")
     st.info("Bu forma, BES uygulamanızdaki **o anki güncel toplam** bilgilerinizi girin.")
     
-    # Formu iki sütuna bölerek daha düzenli hale getir
     col1, col2 = st.columns(2)
 
     with col1:
@@ -57,16 +51,13 @@ with st.form("veri_giris_formu", clear_on_submit=True):
         devlet_katkisi = st.number_input("TOPLAM Devlet Katkısı (TL)", value=0.0, format="%.2f")
         devlet_getirisi = st.number_input("TOPLAM Devlet Katkısı Getirisi (TL)", value=0.0, format="%.2f")
 
-    # Form gönderme butonu
     submitted = st.form_submit_button("Kaydet")
 
     if submitted:
-        # Hesaplamaları yap
         ana_toplam = ana_para + ana_para_getirisi
         devlet_toplam = devlet_katkisi + devlet_getirisi
         toplam_birikim = ana_toplam + devlet_toplam
 
-        # Yeni veriyi bir DataFrame'e dönüştür
         new_data = pd.DataFrame([{
             "Tarih": tarih.strftime("%Y-%m-%d"),
             "Fon Getirisi (%)": fon_getirisi,
@@ -81,23 +72,19 @@ with st.form("veri_giris_formu", clear_on_submit=True):
             "Toplam Birikim": toplam_birikim
         }])
 
-        # Yeni veriyi mevcut verilerle birleştir
         updated_df = pd.concat([existing_data, new_data], ignore_index=True)
 
-        # Google Sheets'i güncelle
         try:
             conn.update(worksheet=WORKSHEET_NAME, data=updated_df)
             st.success("Veri başarıyla kaydedildi!")
         except Exception as e:
             st.error(f"Veri kaydedilirken bir hata oluştu: {e}")
         
-        # Sayfayı yenilemeye gerek yok, st.rerun() daha verimli
         st.rerun()
 
 # -------------------- ÖZET BİLGİLER (METRİKLER) --------------------
 st.subheader("📈 Anlık Bakiye (Son Girdi)")
 if not existing_data.empty:
-    # Verileri tarihe göre sırala ve en son kaydı al
     son_veri = existing_data.sort_values(by="Tarih").iloc[-1]
     
     st.metric("💰 Toplam Birikim", f"{son_veri['Toplam Birikim']:,.2f} TL")
